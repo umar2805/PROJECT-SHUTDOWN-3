@@ -1582,6 +1582,12 @@
     document.getElementById('dbUserName').textContent = firstName;
     document.getElementById('dbUserEmail').textContent = user.email || '';
     document.getElementById('dbUserInitial').textContent = firstName.charAt(0).toUpperCase();
+    // Topbar greeting
+    const greetEl = document.getElementById('dbGreetName');
+    if (greetEl) greetEl.textContent = firstName;
+    // CTA buttons in topbar
+    document.getElementById('dbCreatorCTA').style.display = user.role === 'creator' ? '' : 'none';
+    document.getElementById('dbEditorCTA').style.display  = user.role === 'editor'  ? '' : 'none';
     // Show correct panel
     document.getElementById('dbCreator').style.display = user.role === 'creator' ? 'block' : 'none';
     document.getElementById('dbEditor').style.display  = user.role === 'editor'  ? 'block' : 'none';
@@ -2407,23 +2413,7 @@
     if (el) el.textContent = now.toLocaleDateString('en-US', opts);
   })();
 
-  // Wire greeting name from showDashboard
-  const _origShow = typeof showDashboard !== 'undefined' ? showDashboard : null;
-  // Patch topbar greeting + CTA visibility when showDashboard runs
-  const _patchDash = function(user) {
-    const firstName = (user.name || 'User').split(' ')[0];
-    const el = document.getElementById('dbGreetName');
-    if (el) el.textContent = firstName;
-    document.getElementById('dbCreatorCTA').style.display = user.role === 'creator' ? '' : 'none';
-    document.getElementById('dbEditorCTA').style.display  = user.role === 'editor'  ? '' : 'none';
-  };
-
-  // Extend showDashboard (defined above) to also patch topbar
-  const _origShowDash = window.showDashboard;
-  window.showDashboard = function(user) {
-    _origShowDash(user);
-    _patchDash(user);
-  };
+  // (Topbar greeting and CTA patching is handled inside showDashboard directly)
 </script>
 
 </body>
