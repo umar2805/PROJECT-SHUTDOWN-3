@@ -1454,16 +1454,10 @@
   }
 
   function handleSubmit() {
-    closeModal();
-    document.getElementById('cbWelcomePage').style.display = 'block';
-    document.getElementById('cbWelcomeCreator').style.display = cbRole === 'creator' ? 'block' : 'none';
-    document.getElementById('cbWelcomeEditor').style.display  = cbRole === 'editor'  ? 'block' : 'none';
-    window.scrollTo({ top: 0, behavior: 'instant' });
-  }
-
-  function goBackHome() {
-    document.getElementById('cbWelcomePage').style.display = 'none';
-    window.scrollTo({ top: 0, behavior: 'instant' });
+    const emailInput = document.querySelector('#cbFormLogin input[type="email"], #cbFormSignup input[type="email"]');
+    const name = emailInput ? (emailInput.value.split('@')[0] || 'User') : 'User';
+    const formattedName = name.charAt(0).toUpperCase() + name.slice(1);
+    showDashboard({ name: formattedName, email: emailInput ? emailInput.value : '', picture: '', role: cbRole });
   }
 
   function updatePwdStrength(val) {
@@ -1563,7 +1557,7 @@
     const successEl = document.getElementById('cbSuccess');
     document.getElementById('cbSuccessIcon').textContent  = c.successIcon;
     document.getElementById('cbSuccessIcon').className    = 'cb-success-icon ' + cbRole;
-    document.getElementById('cbSuccessTitle').textContent = `Welcome, ${user.name.split(' ')[0]}!`;
+    document.getElementById('cbSuccessTitle').textContent = `Welcome back, ${user.name.split(' ')[0]}!`;
     document.getElementById('cbSuccessSub').textContent   =
       cbRole === 'creator'
         ? 'Your creator account is ready. Post a project and start finding talent today.'
@@ -1573,11 +1567,51 @@
 
     setTimeout(() => {
       closeModal();
-      document.getElementById('cbWelcomePage').style.display  = 'block';
-      document.getElementById('cbWelcomeCreator').style.display = cbRole === 'creator' ? 'block' : 'none';
-      document.getElementById('cbWelcomeEditor').style.display  = cbRole === 'editor'  ? 'block' : 'none';
-      window.scrollTo({ top: 0, behavior: 'instant' });
+      showDashboard(user);
     }, 1800);
+  }
+
+  function showDashboard(user) {
+    window._cbUser = user;
+    closeModal();
+    const db = document.getElementById('cbWelcomePage');
+    db.style.display = 'flex';
+    document.body.style.overflow = 'hidden';
+    // Set greeting
+    const firstName = (user.name || 'User').split(' ')[0];
+    document.getElementById('dbUserName').textContent = firstName;
+    document.getElementById('dbUserEmail').textContent = user.email || '';
+    document.getElementById('dbUserInitial').textContent = firstName.charAt(0).toUpperCase();
+    // Show correct panel
+    document.getElementById('dbCreator').style.display = user.role === 'creator' ? 'block' : 'none';
+    document.getElementById('dbEditor').style.display  = user.role === 'editor'  ? 'block' : 'none';
+    // Role badge
+    const roleBadge = document.getElementById('dbRoleBadge');
+    if (user.role === 'creator') {
+      roleBadge.textContent = 'Content Creator'; roleBadge.className = 'db-role-badge creator';
+    } else {
+      roleBadge.textContent = 'Creative Professional'; roleBadge.className = 'db-role-badge editor';
+    }
+    window.scrollTo({ top: 0, behavior: 'instant' });
+    // Animate stats
+    setTimeout(() => animateDbStats(), 300);
+  }
+
+  function animateDbStats() {
+    document.querySelectorAll('.db-stat-num[data-target]').forEach(el => {
+      const target = parseInt(el.dataset.target);
+      const prefix = el.dataset.prefix || '';
+      const suffix = el.dataset.suffix || '';
+      const duration = 900;
+      const start = Date.now();
+      const tick = () => {
+        const p = Math.min((Date.now() - start) / duration, 1);
+        const eased = 1 - Math.pow(1 - p, 3);
+        el.textContent = prefix + Math.round(eased * target) + suffix;
+        if (p < 1) requestAnimationFrame(tick);
+      };
+      tick();
+    });
   }
 
   if (document.readyState === 'loading') {
@@ -1590,126 +1624,807 @@
 
 <div id="cbGoogleBtnHidden" style="display:none;position:absolute;"></div>
 
-<!-- ══ DASHBOARD ══ -->
+<!-- ══════════════════════════════════════════
+     DASHBOARD
+══════════════════════════════════════════ -->
 <style>
-  #cbWelcomePage {
-    display: none; position: fixed; inset: 0; z-index: 2000;
-    background: #0d0d0d; overflow-y: auto;
-    font-family: 'Inter', sans-serif;
-  }
-  .db-topbar {
-    display: flex; align-items: center; justify-content: space-between;
-    padding: 1.1rem 2rem;
-    border-bottom: 1px solid rgba(255,255,255,0.08);
-  }
-  .db-logo { font-family: 'Epilogue', sans-serif; font-weight: 700; font-size: 1.1rem; color: #fff; }
-  .db-back {
-    padding: 0.5rem 1.2rem; background: transparent;
-    border: 1px solid rgba(255,255,255,0.2); border-radius: 10px;
-    color: rgba(255,255,255,0.7); font-family: inherit;
-    font-size: 0.85rem; cursor: pointer; transition: all 0.2s;
-  }
-  .db-back:hover { background: rgba(255,255,255,0.08); color: #fff; }
-  .db-body { max-width: 900px; margin: 0 auto; padding: 3rem 2rem; }
-  .db-stats {
-    display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-    gap: 14px; margin-bottom: 2.5rem;
-  }
-  .db-stat { background: #1a1a1a; border: 1px solid rgba(255,255,255,0.07); border-radius: 14px; padding: 1.2rem 1.4rem; }
-  .db-stat-label { font-size: 0.75rem; color: rgba(255,255,255,0.4); margin-bottom: 6px; }
-  .db-stat-val { font-size: 1.6rem; font-weight: 700; color: #fff; }
-  .db-section-title { font-size: 0.78rem; font-weight: 600; color: rgba(255,255,255,0.35); letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 1rem; }
-  .db-cards { display: flex; flex-direction: column; gap: 10px; margin-bottom: 2.5rem; }
-  .db-card {
-    background: #1a1a1a; border: 1px solid rgba(255,255,255,0.07);
-    border-radius: 14px; padding: 1.1rem 1.4rem;
-    display: flex; align-items: center; gap: 14px;
-  }
-  .db-card-icon { width: 40px; height: 40px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 1.1rem; flex-shrink: 0; }
-  .db-card-title { font-size: 0.95rem; font-weight: 600; color: #fff; margin-bottom: 2px; }
-  .db-card-sub { font-size: 0.8rem; color: rgba(255,255,255,0.4); }
-  .db-pill { margin-left: auto; font-size: 0.72rem; font-weight: 600; padding: 4px 10px; border-radius: 20px; white-space: nowrap; }
-  .pill-open   { background: rgba(22,163,74,0.15);  color: #4ade80; }
-  .pill-prog   { background: rgba(98,142,203,0.15); color: #93c5fd; }
-  .pill-done   { background: rgba(168,85,247,0.15); color: #c084fc; }
-  .pill-review { background: rgba(251,191,36,0.15); color: #fbbf24; }
+/* ── Reset & Shell ── */
+#cbWelcomePage {
+  display: none;
+  position: fixed; inset: 0; z-index: 3000;
+  flex-direction: row;
+  font-family: 'Inter', sans-serif;
+  background: #0f1117;
+  overflow: hidden;
+}
 
+/* ── Sidebar ── */
+.db-sidebar {
+  width: 240px; flex-shrink: 0;
+  background: #161820;
+  border-right: 1px solid rgba(255,255,255,0.06);
+  display: flex; flex-direction: column;
+  padding: 0;
+  overflow-y: auto;
+}
+.db-sidebar-logo {
+  display: flex; align-items: center; gap: 10px;
+  padding: 1.5rem 1.4rem 1.2rem;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+.db-sidebar-logo-mark {
+  width: 30px; height: 30px; border-radius: 8px;
+  background: linear-gradient(135deg, #628ECB, #7db3e8);
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.db-sidebar-logo-mark svg { color: white; }
+.db-sidebar-logo-name {
+  font-family: 'Epilogue', sans-serif;
+  font-weight: 700; font-size: 1rem; color: #fff;
+}
+
+/* Role badge under logo */
+.db-role-badge {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 3px 10px; border-radius: 100px;
+  font-size: 0.68rem; font-weight: 700; letter-spacing: 0.06em;
+  text-transform: uppercase; margin: 1rem 1.4rem 0;
+  width: fit-content;
+}
+.db-role-badge.creator { background: rgba(98,142,203,0.15); color: #7db3e8; }
+.db-role-badge.editor  { background: rgba(22,163,74,0.15);  color: #4ade80; }
+
+/* User card */
+.db-user-card {
+  display: flex; align-items: center; gap: 10px;
+  margin: 1rem 1.4rem 1.4rem;
+  padding: 12px; border-radius: 12px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.07);
+}
+.db-user-avatar {
+  width: 36px; height: 36px; border-radius: 50%;
+  background: linear-gradient(135deg, #628ECB, #7db3e8);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 0.9rem; font-weight: 700; color: white; flex-shrink: 0;
+}
+.db-user-name { font-size: 0.85rem; font-weight: 600; color: #fff; line-height: 1.2; }
+.db-user-email { font-size: 0.72rem; color: rgba(255,255,255,0.35); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 130px; }
+
+/* Nav items */
+.db-nav { display: flex; flex-direction: column; gap: 2px; padding: 0 0.8rem; flex: 1; }
+.db-nav-section { font-size: 0.65rem; font-weight: 700; color: rgba(255,255,255,0.2); letter-spacing: 0.1em; text-transform: uppercase; padding: 1rem 0.6rem 0.4rem; }
+.db-nav-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 9px 12px; border-radius: 10px;
+  font-size: 0.875rem; font-weight: 500; color: rgba(255,255,255,0.45);
+  cursor: pointer; transition: all 0.2s; user-select: none;
+  border: none; background: none; width: 100%; text-align: left;
+}
+.db-nav-item:hover { background: rgba(255,255,255,0.06); color: rgba(255,255,255,0.8); }
+.db-nav-item.active { background: rgba(98,142,203,0.15); color: #7db3e8; font-weight: 600; }
+.db-nav-item.active svg { color: #7db3e8; }
+.db-nav-item svg { width: 16px; height: 16px; flex-shrink: 0; opacity: 0.7; }
+.db-nav-item .db-nav-badge { margin-left: auto; font-size: 0.68rem; font-weight: 700; background: rgba(98,142,203,0.25); color: #7db3e8; padding: 1px 7px; border-radius: 20px; }
+.db-nav-item.active .db-nav-badge { background: rgba(98,142,203,0.35); }
+
+/* Bottom of sidebar */
+.db-sidebar-footer {
+  padding: 1rem;
+  border-top: 1px solid rgba(255,255,255,0.06);
+}
+.db-logout-btn {
+  width: 100%; padding: 9px 12px;
+  display: flex; align-items: center; gap: 9px;
+  background: none; border: 1px solid rgba(255,255,255,0.08); border-radius: 10px;
+  color: rgba(255,255,255,0.4); font-size: 0.83rem; font-weight: 500; cursor: pointer;
+  transition: all 0.2s; font-family: inherit;
+}
+.db-logout-btn:hover { background: rgba(255,255,255,0.05); color: rgba(255,255,255,0.7); border-color: rgba(255,255,255,0.15); }
+
+/* ── Main Content Area ── */
+.db-main {
+  flex: 1; display: flex; flex-direction: column; overflow: hidden;
+}
+
+/* Top bar */
+.db-topbar {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 1rem 2rem;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+  background: #161820;
+  flex-shrink: 0;
+}
+.db-topbar-left { display: flex; flex-direction: column; }
+.db-topbar-greeting { font-size: 1.15rem; font-weight: 700; color: #fff; }
+.db-topbar-date { font-size: 0.78rem; color: rgba(255,255,255,0.3); margin-top: 2px; }
+.db-topbar-actions { display: flex; align-items: center; gap: 10px; }
+.db-topbar-btn {
+  padding: 8px 18px; border-radius: 10px; font-family: inherit;
+  font-size: 0.82rem; font-weight: 600; cursor: pointer; transition: all 0.2s;
+}
+.db-topbar-btn.primary { background: #628ECB; color: white; border: none; }
+.db-topbar-btn.primary:hover { background: #4a72a8; }
+.db-topbar-btn.ghost { background: transparent; color: rgba(255,255,255,0.5); border: 1px solid rgba(255,255,255,0.1); }
+.db-topbar-btn.ghost:hover { background: rgba(255,255,255,0.06); color: #fff; border-color: rgba(255,255,255,0.2); }
+
+/* Notification dot */
+.db-notif {
+  width: 34px; height: 34px; border-radius: 9px; border: 1px solid rgba(255,255,255,0.1);
+  background: transparent; display: flex; align-items: center; justify-content: center;
+  cursor: pointer; position: relative; transition: all 0.2s;
+}
+.db-notif:hover { background: rgba(255,255,255,0.06); }
+.db-notif svg { color: rgba(255,255,255,0.4); width: 16px; height: 16px; }
+.db-notif-dot { position: absolute; top: 6px; right: 7px; width: 6px; height: 6px; border-radius: 50%; background: #f87171; border: 1.5px solid #161820; }
+
+/* Scrollable content */
+.db-content {
+  flex: 1; overflow-y: auto; padding: 2rem;
+  background: #0f1117;
+}
+
+/* ── Stat Cards ── */
+.db-stats-row {
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px;
+  margin-bottom: 2rem;
+}
+.db-stat-card {
+  background: #161820; border: 1px solid rgba(255,255,255,0.07);
+  border-radius: 16px; padding: 1.3rem 1.4rem;
+  position: relative; overflow: hidden;
+  transition: border-color 0.2s, transform 0.2s;
+}
+.db-stat-card:hover { border-color: rgba(98,142,203,0.3); transform: translateY(-2px); }
+.db-stat-card::after {
+  content: ''; position: absolute;
+  top: -30px; right: -30px; width: 80px; height: 80px; border-radius: 50%;
+  background: radial-gradient(circle, rgba(98,142,203,0.1), transparent 70%);
+  pointer-events: none;
+}
+.db-stat-icon {
+  width: 34px; height: 34px; border-radius: 9px;
+  display: flex; align-items: center; justify-content: center;
+  margin-bottom: 1rem; font-size: 1rem;
+}
+.db-stat-label { font-size: 0.72rem; color: rgba(255,255,255,0.35); font-weight: 500; margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.05em; }
+.db-stat-num { font-size: 1.8rem; font-weight: 800; color: #fff; line-height: 1; }
+.db-stat-delta { font-size: 0.72rem; margin-top: 6px; font-weight: 600; display: flex; align-items: center; gap: 3px; }
+.db-stat-delta.up { color: #4ade80; }
+.db-stat-delta.neutral { color: rgba(255,255,255,0.3); }
+
+/* ── Two-column layout ── */
+.db-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+.db-grid-3-1 { display: grid; grid-template-columns: 2fr 1fr; gap: 16px; margin-bottom: 16px; }
+
+/* ── Panel card ── */
+.db-panel {
+  background: #161820; border: 1px solid rgba(255,255,255,0.07);
+  border-radius: 16px; overflow: hidden;
+}
+.db-panel-head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 1.1rem 1.4rem;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+.db-panel-title { font-size: 0.88rem; font-weight: 700; color: #fff; }
+.db-panel-action { font-size: 0.75rem; color: #628ECB; cursor: pointer; font-weight: 600; transition: color 0.2s; }
+.db-panel-action:hover { color: #7db3e8; }
+.db-panel-body { padding: 1.1rem 1.4rem; }
+
+/* ── Project / Job rows ── */
+.db-item-row {
+  display: flex; align-items: center; gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+  transition: background 0.15s;
+}
+.db-item-row:last-child { border-bottom: none; padding-bottom: 0; }
+.db-item-icon {
+  width: 36px; height: 36px; border-radius: 9px; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center; font-size: 0.95rem;
+}
+.db-item-info { flex: 1; min-width: 0; }
+.db-item-title { font-size: 0.85rem; font-weight: 600; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.db-item-sub { font-size: 0.73rem; color: rgba(255,255,255,0.35); margin-top: 2px; }
+.db-pill {
+  font-size: 0.68rem; font-weight: 700; padding: 3px 9px;
+  border-radius: 20px; white-space: nowrap; flex-shrink: 0;
+}
+.pill-open     { background: rgba(22,163,74,0.15);   color: #4ade80; }
+.pill-prog     { background: rgba(98,142,203,0.15);  color: #93c5fd; }
+.pill-done     { background: rgba(168,85,247,0.15);  color: #c084fc; }
+.pill-review   { background: rgba(251,191,36,0.15);  color: #fbbf24; }
+.pill-applied  { background: rgba(251,146,60,0.15);  color: #fb923c; }
+
+/* ── Activity feed ── */
+.db-activity-item {
+  display: flex; align-items: flex-start; gap: 10px;
+  padding: 9px 0;
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+}
+.db-activity-item:last-child { border-bottom: none; }
+.db-activity-dot {
+  width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+  margin-top: 5px;
+}
+.db-activity-text { font-size: 0.8rem; color: rgba(255,255,255,0.55); line-height: 1.45; }
+.db-activity-text strong { color: rgba(255,255,255,0.85); font-weight: 600; }
+.db-activity-time { font-size: 0.7rem; color: rgba(255,255,255,0.2); margin-top: 2px; }
+
+/* ── Skills / Tags ── */
+.db-tag-list { display: flex; flex-wrap: wrap; gap: 7px; padding-top: 4px; }
+.db-tag {
+  background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 8px; padding: 4px 11px;
+  font-size: 0.75rem; font-weight: 500; color: rgba(255,255,255,0.5);
+}
+.db-tag.accent { background: rgba(98,142,203,0.12); border-color: rgba(98,142,203,0.2); color: #7db3e8; }
+
+/* ── Progress bar ── */
+.db-progress-wrap { margin-top: 8px; }
+.db-progress-label { display: flex; justify-content: space-between; font-size: 0.73rem; margin-bottom: 5px; }
+.db-progress-label span:first-child { color: rgba(255,255,255,0.5); }
+.db-progress-label span:last-child  { color: rgba(255,255,255,0.25); }
+.db-progress-bar { height: 5px; background: rgba(255,255,255,0.07); border-radius: 10px; overflow: hidden; }
+.db-progress-fill { height: 100%; border-radius: 10px; transition: width 1s ease; }
+
+/* ── Quick actions ── */
+.db-quick-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.db-quick-btn {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 6px;
+  padding: 14px; border-radius: 12px; cursor: pointer;
+  background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.07);
+  transition: all 0.2s; font-family: inherit; text-align: left;
+}
+.db-quick-btn:hover { background: rgba(255,255,255,0.07); border-color: rgba(255,255,255,0.14); transform: translateY(-1px); }
+.db-quick-btn-icon { font-size: 1.2rem; }
+.db-quick-btn-label { font-size: 0.78rem; font-weight: 600; color: rgba(255,255,255,0.75); }
+.db-quick-btn-sub { font-size: 0.7rem; color: rgba(255,255,255,0.3); }
+
+/* ── Applicant card ── */
+.db-applicant {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.04);
+}
+.db-applicant:last-child { border-bottom: none; }
+.db-applicant-avatar {
+  width: 34px; height: 34px; border-radius: 50%; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 0.85rem; font-weight: 700; color: white;
+}
+.db-applicant-name { font-size: 0.83rem; font-weight: 600; color: #fff; }
+.db-applicant-role { font-size: 0.71rem; color: rgba(255,255,255,0.35); }
+.db-applicant-rate { margin-left: auto; font-size: 0.8rem; font-weight: 700; color: #4ade80; }
+.db-applicant-stars { font-size: 0.7rem; color: #fbbf24; }
+
+/* ── Empty state ── */
+.db-empty {
+  text-align: center; padding: 2rem 1rem;
+  color: rgba(255,255,255,0.2); font-size: 0.83rem;
+}
+.db-empty-icon { font-size: 2rem; margin-bottom: 8px; opacity: 0.5; }
+
+/* ── Section heading ── */
+.db-section-heading {
+  font-size: 0.7rem; font-weight: 700; color: rgba(255,255,255,0.2);
+  letter-spacing: 0.1em; text-transform: uppercase;
+  margin-bottom: 12px; margin-top: 4px;
+}
+
+/* ── Earnings chart bars ── */
+.db-chart { display: flex; align-items: flex-end; gap: 6px; height: 70px; }
+.db-chart-bar-wrap { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; height: 100%; justify-content: flex-end; }
+.db-chart-bar { width: 100%; border-radius: 5px 5px 0 0; transition: height 0.9s ease; min-height: 4px; }
+.db-chart-label { font-size: 0.62rem; color: rgba(255,255,255,0.2); }
+
+/* ── Mobile ── */
+@media (max-width: 900px) {
+  .db-sidebar { display: none; }
+  .db-stats-row { grid-template-columns: 1fr 1fr; }
+  .db-grid-2, .db-grid-3-1 { grid-template-columns: 1fr; }
+}
+@media (max-width: 520px) {
+  .db-stats-row { grid-template-columns: 1fr 1fr; }
+  .db-content { padding: 1rem; }
+  .db-topbar { padding: 0.9rem 1rem; }
+  .db-quick-actions { grid-template-columns: 1fr 1fr; }
+}
 </style>
 
 <div id="cbWelcomePage">
-  <div class="db-topbar">
-    <div class="db-logo">CreatorBridge</div>
-    <button class="db-back" onclick="goBackHome()">← Back to homepage</button>
-  </div>
 
-  <!-- Creator dashboard -->
-  <div id="cbWelcomeCreator" style="display:none">
-    <div class="db-body">
-      <div class="db-stats">
-        <div class="db-stat"><div class="db-stat-label">Active projects</div><div class="db-stat-val">3</div></div>
-        <div class="db-stat"><div class="db-stat-label">Applicants</div><div class="db-stat-val">12</div></div>
-        <div class="db-stat"><div class="db-stat-label">Completed</div><div class="db-stat-val">28</div></div>
-        <div class="db-stat"><div class="db-stat-label">Total spent</div><div class="db-stat-val">$1.4k</div></div>
+  <!-- ── Sidebar ── -->
+  <div class="db-sidebar">
+    <div class="db-sidebar-logo">
+      <div class="db-sidebar-logo-mark">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
       </div>
-      <div class="db-section-title">My projects</div>
-      <div class="db-cards">
-        <div class="db-card">
-          <div class="db-card-icon" style="background:rgba(98,142,203,0.15)">📝</div>
-          <div><div class="db-card-title">YouTube Thumbnail — Tech Review</div><div class="db-card-sub">Budget $80 · 4 applicants</div></div>
-          <span class="db-pill pill-open">Open</span>
-        </div>
-        <div class="db-card">
-          <div class="db-card-icon" style="background:rgba(22,163,74,0.15)">🎬</div>
-          <div><div class="db-card-title">Intro animation — new series</div><div class="db-card-sub">Budget $250 · Alex R. hired</div></div>
-          <span class="db-pill pill-prog">In progress</span>
-        </div>
-        <div class="db-card">
-          <div class="db-card-icon" style="background:rgba(168,85,247,0.15)">✂️</div>
-          <div><div class="db-card-title">Short-form video edits (x5)</div><div class="db-card-sub">Budget $400 · Priya S.</div></div>
-          <span class="db-pill pill-done">Complete</span>
-        </div>
+      <span class="db-sidebar-logo-name">CreatorBridge</span>
+    </div>
+
+    <div id="dbRoleBadge" class="db-role-badge creator">Content Creator</div>
+
+    <div class="db-user-card">
+      <div class="db-user-avatar" id="dbUserInitial">U</div>
+      <div>
+        <div class="db-user-name" id="dbUserName">User</div>
+        <div class="db-user-email" id="dbUserEmail">user@example.com</div>
       </div>
+    </div>
+
+    <nav class="db-nav">
+      <div class="db-nav-section">Menu</div>
+      <button class="db-nav-item active">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+        Dashboard
+      </button>
+      <button class="db-nav-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+        Projects
+        <span class="db-nav-badge">3</span>
+      </button>
+      <button class="db-nav-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>
+        Talent
+      </button>
+      <button class="db-nav-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+        Messages
+        <span class="db-nav-badge">2</span>
+      </button>
+      <div class="db-nav-section">Account</div>
+      <button class="db-nav-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
+        Profile
+      </button>
+      <button class="db-nav-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93A10 10 0 105.93 19.07 10 10 0 0019.07 4.93z"/></svg>
+        Settings
+      </button>
+    </nav>
+
+    <div class="db-sidebar-footer">
+      <button class="db-logout-btn" onclick="dbLogout()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+        Log out
+      </button>
     </div>
   </div>
 
-  <!-- Editor dashboard -->
-  <div id="cbWelcomeEditor" style="display:none">
-    <div class="db-body">
-      <div class="db-stats">
-        <div class="db-stat"><div class="db-stat-label">Active jobs</div><div class="db-stat-val">2</div></div>
-        <div class="db-stat"><div class="db-stat-label">Applied</div><div class="db-stat-val">5</div></div>
-        <div class="db-stat"><div class="db-stat-label">Completed</div><div class="db-stat-val">41</div></div>
-        <div class="db-stat"><div class="db-stat-label">Total earned</div><div class="db-stat-val">$3.2k</div></div>
+  <!-- ── Main ── -->
+  <div class="db-main">
+
+    <!-- Top bar -->
+    <div class="db-topbar">
+      <div class="db-topbar-left">
+        <div class="db-topbar-greeting">Good day, <span id="dbGreetName">there</span> 👋</div>
+        <div class="db-topbar-date" id="dbDate"></div>
       </div>
-      <div class="db-section-title">My jobs</div>
-      <div class="db-cards">
-        <div class="db-card">
-          <div class="db-card-icon" style="background:rgba(98,142,203,0.15)">✂️</div>
-          <div><div class="db-card-title">Short-form video edits (x5)</div><div class="db-card-sub">Marcus K. · Due in 3 days</div></div>
-          <span class="db-pill pill-prog">In progress</span>
-        </div>
-        <div class="db-card">
-          <div class="db-card-icon" style="background:rgba(251,191,36,0.15)">🎙️</div>
-          <div><div class="db-card-title">Podcast episode cuts (x3)</div><div class="db-card-sub">Jade O. · Awaiting review</div></div>
-          <span class="db-pill pill-review">Review</span>
-        </div>
-      </div>
-      <div class="db-section-title">Open projects</div>
-      <div class="db-cards">
-        <div class="db-card">
-          <div class="db-card-icon" style="background:rgba(22,163,74,0.15)">📸</div>
-          <div><div class="db-card-title">YouTube Thumbnail — Tech Review</div><div class="db-card-sub">Budget $80 · 4 others applied</div></div>
-          <span class="db-pill pill-open">Open</span>
-        </div>
-        <div class="db-card">
-          <div class="db-card-icon" style="background:rgba(168,85,247,0.15)">📱</div>
-          <div><div class="db-card-title">Reels editor — lifestyle channel</div><div class="db-card-sub">Budget $300 · 2 others applied</div></div>
-          <span class="db-pill pill-open">Open</span>
-        </div>
+      <div class="db-topbar-actions">
+        <button class="db-notif">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>
+          <div class="db-notif-dot"></div>
+        </button>
+        <!-- Creator CTA -->
+        <button class="db-topbar-btn primary" id="dbCreatorCTA" onclick="">+ Post a Project</button>
+        <!-- Editor CTA -->
+        <button class="db-topbar-btn primary" id="dbEditorCTA" style="display:none">Browse Projects</button>
       </div>
     </div>
-  </div>
-</div>
+
+    <!-- Scrollable content -->
+    <div class="db-content">
+
+      <!-- ── CREATOR DASHBOARD ── -->
+      <div id="dbCreator">
+
+        <!-- Stats -->
+        <div class="db-stats-row">
+          <div class="db-stat-card">
+            <div class="db-stat-icon" style="background:rgba(98,142,203,0.15)">📂</div>
+            <div class="db-stat-label">Active Projects</div>
+            <div class="db-stat-num" data-target="3" data-prefix="" data-suffix="">0</div>
+            <div class="db-stat-delta up">↑ 1 this week</div>
+          </div>
+          <div class="db-stat-card">
+            <div class="db-stat-icon" style="background:rgba(251,191,36,0.15)">👥</div>
+            <div class="db-stat-label">Applicants</div>
+            <div class="db-stat-num" data-target="12" data-prefix="" data-suffix="">0</div>
+            <div class="db-stat-delta up">↑ 5 new today</div>
+          </div>
+          <div class="db-stat-card">
+            <div class="db-stat-icon" style="background:rgba(168,85,247,0.15)">✅</div>
+            <div class="db-stat-label">Completed</div>
+            <div class="db-stat-num" data-target="28" data-prefix="" data-suffix="">0</div>
+            <div class="db-stat-delta neutral">All time</div>
+          </div>
+          <div class="db-stat-card">
+            <div class="db-stat-icon" style="background:rgba(22,163,74,0.15)">💰</div>
+            <div class="db-stat-label">Total Spent</div>
+            <div class="db-stat-num" data-target="1400" data-prefix="$" data-suffix="">0</div>
+            <div class="db-stat-delta up">↑ $320 this month</div>
+          </div>
+        </div>
+
+        <!-- Row 1 -->
+        <div class="db-grid-3-1">
+
+          <!-- Active Projects -->
+          <div class="db-panel">
+            <div class="db-panel-head">
+              <div class="db-panel-title">Active Projects</div>
+              <span class="db-panel-action">+ New project</span>
+            </div>
+            <div class="db-panel-body">
+              <div class="db-item-row">
+                <div class="db-item-icon" style="background:rgba(98,142,203,0.12)">📝</div>
+                <div class="db-item-info">
+                  <div class="db-item-title">YouTube Thumbnail — Tech Review</div>
+                  <div class="db-item-sub">Budget $80 · 4 applicants · Posted 2 days ago</div>
+                </div>
+                <span class="db-pill pill-open">Open</span>
+              </div>
+              <div class="db-item-row">
+                <div class="db-item-icon" style="background:rgba(22,163,74,0.12)">🎬</div>
+                <div class="db-item-info">
+                  <div class="db-item-title">Intro animation — New series</div>
+                  <div class="db-item-sub">Budget $250 · Alex R. hired · Due in 5 days</div>
+                </div>
+                <span class="db-pill pill-prog">In Progress</span>
+              </div>
+              <div class="db-item-row">
+                <div class="db-item-icon" style="background:rgba(168,85,247,0.12)">✂️</div>
+                <div class="db-item-info">
+                  <div class="db-item-title">Short-form video edits (×5)</div>
+                  <div class="db-item-sub">Budget $400 · Priya S. · Delivered yesterday</div>
+                </div>
+                <span class="db-pill pill-done">Complete</span>
+              </div>
+              <!-- Progress for in-progress -->
+              <div style="margin-top:12px">
+                <div class="db-progress-wrap">
+                  <div class="db-progress-label"><span>Intro animation progress</span><span>60%</span></div>
+                  <div class="db-progress-bar"><div class="db-progress-fill" style="width:60%;background:linear-gradient(90deg,#628ECB,#7db3e8)"></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Quick Actions -->
+          <div class="db-panel">
+            <div class="db-panel-head">
+              <div class="db-panel-title">Quick Actions</div>
+            </div>
+            <div class="db-panel-body">
+              <div class="db-quick-actions">
+                <button class="db-quick-btn">
+                  <div class="db-quick-btn-icon">📢</div>
+                  <div class="db-quick-btn-label">Post Project</div>
+                  <div class="db-quick-btn-sub">Find talent fast</div>
+                </button>
+                <button class="db-quick-btn">
+                  <div class="db-quick-btn-icon">🔍</div>
+                  <div class="db-quick-btn-label">Browse Talent</div>
+                  <div class="db-quick-btn-sub">Explore profiles</div>
+                </button>
+                <button class="db-quick-btn">
+                  <div class="db-quick-btn-icon">💬</div>
+                  <div class="db-quick-btn-label">Messages</div>
+                  <div class="db-quick-btn-sub">2 unread</div>
+                </button>
+                <button class="db-quick-btn">
+                  <div class="db-quick-btn-icon">📊</div>
+                  <div class="db-quick-btn-label">Analytics</div>
+                  <div class="db-quick-btn-sub">View reports</div>
+                </button>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Row 2 -->
+        <div class="db-grid-2">
+
+          <!-- Top Applicants -->
+          <div class="db-panel">
+            <div class="db-panel-head">
+              <div class="db-panel-title">Top Applicants</div>
+              <span class="db-panel-action">View all →</span>
+            </div>
+            <div class="db-panel-body">
+              <div class="db-applicant">
+                <div class="db-applicant-avatar" style="background:linear-gradient(135deg,#628ECB,#7db3e8)">A</div>
+                <div>
+                  <div class="db-applicant-name">Alex Rivera</div>
+                  <div class="db-applicant-role">Motion Designer · <span class="db-applicant-stars">★★★★★</span> 4.9</div>
+                </div>
+                <div class="db-applicant-rate">$65/hr</div>
+              </div>
+              <div class="db-applicant">
+                <div class="db-applicant-avatar" style="background:linear-gradient(135deg,#16a34a,#34d399)">P</div>
+                <div>
+                  <div class="db-applicant-name">Priya Sharma</div>
+                  <div class="db-applicant-role">Video Editor · <span class="db-applicant-stars">★★★★★</span> 4.8</div>
+                </div>
+                <div class="db-applicant-rate">$55/hr</div>
+              </div>
+              <div class="db-applicant">
+                <div class="db-applicant-avatar" style="background:linear-gradient(135deg,#7c3aed,#a78bfa)">M</div>
+                <div>
+                  <div class="db-applicant-name">Marcus Lee</div>
+                  <div class="db-applicant-role">Thumbnail Designer · <span class="db-applicant-stars">★★★★☆</span> 4.6</div>
+                </div>
+                <div class="db-applicant-rate">$45/hr</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Recent Activity -->
+          <div class="db-panel">
+            <div class="db-panel-head">
+              <div class="db-panel-title">Recent Activity</div>
+            </div>
+            <div class="db-panel-body">
+              <div class="db-activity-item">
+                <div class="db-activity-dot" style="background:#4ade80"></div>
+                <div>
+                  <div class="db-activity-text"><strong>Priya S.</strong> delivered the short-form video pack</div>
+                  <div class="db-activity-time">2 hours ago</div>
+                </div>
+              </div>
+              <div class="db-activity-item">
+                <div class="db-activity-dot" style="background:#93c5fd"></div>
+                <div>
+                  <div class="db-activity-text"><strong>3 new applicants</strong> on YouTube Thumbnail project</div>
+                  <div class="db-activity-time">5 hours ago</div>
+                </div>
+              </div>
+              <div class="db-activity-item">
+                <div class="db-activity-dot" style="background:#fbbf24"></div>
+                <div>
+                  <div class="db-activity-text"><strong>Alex R.</strong> submitted a progress update</div>
+                  <div class="db-activity-time">Yesterday</div>
+                </div>
+              </div>
+              <div class="db-activity-item">
+                <div class="db-activity-dot" style="background:#c084fc"></div>
+                <div>
+                  <div class="db-activity-text">Payment of <strong>$400</strong> released to Priya S.</div>
+                  <div class="db-activity-time">Yesterday</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+      </div><!-- /dbCreator -->
+
+      <!-- ── EDITOR DASHBOARD ── -->
+      <div id="dbEditor" style="display:none">
+
+        <!-- Stats -->
+        <div class="db-stats-row">
+          <div class="db-stat-card">
+            <div class="db-stat-icon" style="background:rgba(98,142,203,0.15)">💼</div>
+            <div class="db-stat-label">Active Jobs</div>
+            <div class="db-stat-num" data-target="2" data-prefix="" data-suffix="">0</div>
+            <div class="db-stat-delta up">↑ 1 new this week</div>
+          </div>
+          <div class="db-stat-card">
+            <div class="db-stat-icon" style="background:rgba(251,146,60,0.15)">📨</div>
+            <div class="db-stat-label">Applied</div>
+            <div class="db-stat-num" data-target="5" data-prefix="" data-suffix="">0</div>
+            <div class="db-stat-delta neutral">Awaiting reply</div>
+          </div>
+          <div class="db-stat-card">
+            <div class="db-stat-icon" style="background:rgba(168,85,247,0.15)">🏆</div>
+            <div class="db-stat-label">Completed</div>
+            <div class="db-stat-num" data-target="41" data-prefix="" data-suffix="">0</div>
+            <div class="db-stat-delta neutral">All time</div>
+          </div>
+          <div class="db-stat-card">
+            <div class="db-stat-icon" style="background:rgba(22,163,74,0.15)">💵</div>
+            <div class="db-stat-label">Total Earned</div>
+            <div class="db-stat-num" data-target="3200" data-prefix="$" data-suffix="">0</div>
+            <div class="db-stat-delta up">↑ $640 this month</div>
+          </div>
+        </div>
+
+        <!-- Row 1 -->
+        <div class="db-grid-3-1">
+
+          <!-- My Jobs -->
+          <div class="db-panel">
+            <div class="db-panel-head">
+              <div class="db-panel-title">My Jobs</div>
+              <span class="db-panel-action">Browse open →</span>
+            </div>
+            <div class="db-panel-body">
+              <div class="db-item-row">
+                <div class="db-item-icon" style="background:rgba(98,142,203,0.12)">✂️</div>
+                <div class="db-item-info">
+                  <div class="db-item-title">Short-form video edits (×5)</div>
+                  <div class="db-item-sub">Marcus K. · $400 · Due in 3 days</div>
+                </div>
+                <span class="db-pill pill-prog">In Progress</span>
+              </div>
+              <div class="db-item-row">
+                <div class="db-item-icon" style="background:rgba(251,191,36,0.12)">🎙️</div>
+                <div class="db-item-info">
+                  <div class="db-item-title">Podcast episode cuts (×3)</div>
+                  <div class="db-item-sub">Jade O. · $180 · Awaiting client review</div>
+                </div>
+                <span class="db-pill pill-review">Review</span>
+              </div>
+              <!-- Earnings chart -->
+              <div style="margin-top:14px">
+                <div class="db-section-heading">Monthly earnings</div>
+                <div class="db-chart" id="dbEarningsChart">
+                  <div class="db-chart-bar-wrap"><div class="db-chart-bar" style="height:40%;background:rgba(98,142,203,0.3)"></div><div class="db-chart-label">Jan</div></div>
+                  <div class="db-chart-bar-wrap"><div class="db-chart-bar" style="height:60%;background:rgba(98,142,203,0.3)"></div><div class="db-chart-label">Feb</div></div>
+                  <div class="db-chart-bar-wrap"><div class="db-chart-bar" style="height:50%;background:rgba(98,142,203,0.3)"></div><div class="db-chart-label">Mar</div></div>
+                  <div class="db-chart-bar-wrap"><div class="db-chart-bar" style="height:75%;background:rgba(98,142,203,0.3)"></div><div class="db-chart-label">Apr</div></div>
+                  <div class="db-chart-bar-wrap"><div class="db-chart-bar" style="height:55%;background:rgba(98,142,203,0.3)"></div><div class="db-chart-label">May</div></div>
+                  <div class="db-chart-bar-wrap"><div class="db-chart-bar" style="height:100%;background:linear-gradient(180deg,#628ECB,#7db3e8)"></div><div class="db-chart-label">Jun</div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Quick Actions (Editor) -->
+          <div class="db-panel">
+            <div class="db-panel-head">
+              <div class="db-panel-title">Quick Actions</div>
+            </div>
+            <div class="db-panel-body">
+              <div class="db-quick-actions">
+                <button class="db-quick-btn">
+                  <div class="db-quick-btn-icon">🔍</div>
+                  <div class="db-quick-btn-label">Find Jobs</div>
+                  <div class="db-quick-btn-sub">Browse briefs</div>
+                </button>
+                <button class="db-quick-btn">
+                  <div class="db-quick-btn-icon">🎨</div>
+                  <div class="db-quick-btn-label">Portfolio</div>
+                  <div class="db-quick-btn-sub">Update work</div>
+                </button>
+                <button class="db-quick-btn">
+                  <div class="db-quick-btn-icon">💬</div>
+                  <div class="db-quick-btn-label">Messages</div>
+                  <div class="db-quick-btn-sub">2 unread</div>
+                </button>
+                <button class="db-quick-btn">
+                  <div class="db-quick-btn-icon">💳</div>
+                  <div class="db-quick-btn-label">Payouts</div>
+                  <div class="db-quick-btn-sub">Withdraw</div>
+                </button>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Row 2 -->
+        <div class="db-grid-2">
+
+          <!-- Open Projects -->
+          <div class="db-panel">
+            <div class="db-panel-head">
+              <div class="db-panel-title">Matching Open Projects</div>
+              <span class="db-panel-action">View all →</span>
+            </div>
+            <div class="db-panel-body">
+              <div class="db-item-row">
+                <div class="db-item-icon" style="background:rgba(22,163,74,0.12)">📸</div>
+                <div class="db-item-info">
+                  <div class="db-item-title">YouTube Thumbnail — Tech Review</div>
+                  <div class="db-item-sub">Budget $80 · 4 others applied</div>
+                </div>
+                <span class="db-pill pill-open">Open</span>
+              </div>
+              <div class="db-item-row">
+                <div class="db-item-icon" style="background:rgba(168,85,247,0.12)">📱</div>
+                <div class="db-item-info">
+                  <div class="db-item-title">Reels editor — Lifestyle channel</div>
+                  <div class="db-item-sub">Budget $300 · 2 others applied</div>
+                </div>
+                <span class="db-pill pill-open">Open</span>
+              </div>
+              <div class="db-item-row">
+                <div class="db-item-icon" style="background:rgba(251,191,36,0.12)">🎬</div>
+                <div class="db-item-info">
+                  <div class="db-item-title">Long-form interview cuts (×4 eps)</div>
+                  <div class="db-item-sub">Budget $500 · 1 other applied</div>
+                </div>
+                <span class="db-pill pill-open">Open</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Profile & Skills -->
+          <div class="db-panel">
+            <div class="db-panel-head">
+              <div class="db-panel-title">Your Profile Strength</div>
+              <span class="db-panel-action">Edit profile →</span>
+            </div>
+            <div class="db-panel-body">
+              <div class="db-progress-wrap" style="margin-bottom:14px">
+                <div class="db-progress-label"><span>Profile completeness</span><span>78%</span></div>
+                <div class="db-progress-bar"><div class="db-progress-fill" style="width:78%;background:linear-gradient(90deg,#628ECB,#7db3e8)"></div></div>
+              </div>
+              <div class="db-section-heading">Your skills</div>
+              <div class="db-tag-list">
+                <span class="db-tag accent">Video Editing</span>
+                <span class="db-tag accent">Premiere Pro</span>
+                <span class="db-tag accent">After Effects</span>
+                <span class="db-tag">Color Grading</span>
+                <span class="db-tag">Motion Graphics</span>
+                <span class="db-tag">Short-form</span>
+              </div>
+              <div style="margin-top:14px">
+                <div class="db-section-heading">Recent Activity</div>
+                <div class="db-activity-item">
+                  <div class="db-activity-dot" style="background:#4ade80"></div>
+                  <div>
+                    <div class="db-activity-text"><strong>Jade O.</strong> left you a 5-star review</div>
+                    <div class="db-activity-time">1 hour ago</div>
+                  </div>
+                </div>
+                <div class="db-activity-item">
+                  <div class="db-activity-dot" style="background:#93c5fd"></div>
+                  <div>
+                    <div class="db-activity-text">You applied to <strong>3 new projects</strong> today</div>
+                    <div class="db-activity-time">3 hours ago</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+      </div><!-- /dbEditor -->
+
+    </div><!-- /db-content -->
+  </div><!-- /db-main -->
+</div><!-- /cbWelcomePage -->
+
+<script>
+  function dbLogout() {
+    document.getElementById('cbWelcomePage').style.display = 'none';
+    document.body.style.overflow = '';
+  }
+
+  // Set date in topbar
+  (function() {
+    const now = new Date();
+    const opts = { weekday:'long', year:'numeric', month:'long', day:'numeric' };
+    const el = document.getElementById('dbDate');
+    if (el) el.textContent = now.toLocaleDateString('en-US', opts);
+  })();
+
+  // Wire greeting name from showDashboard
+  const _origShow = typeof showDashboard !== 'undefined' ? showDashboard : null;
+  // Patch topbar greeting + CTA visibility when showDashboard runs
+  const _patchDash = function(user) {
+    const firstName = (user.name || 'User').split(' ')[0];
+    const el = document.getElementById('dbGreetName');
+    if (el) el.textContent = firstName;
+    document.getElementById('dbCreatorCTA').style.display = user.role === 'creator' ? '' : 'none';
+    document.getElementById('dbEditorCTA').style.display  = user.role === 'editor'  ? '' : 'none';
+  };
+
+  // Extend showDashboard (defined above) to also patch topbar
+  const _origShowDash = window.showDashboard;
+  window.showDashboard = function(user) {
+    _origShowDash(user);
+    _patchDash(user);
+  };
+</script>
 
 </body>
 </html>
